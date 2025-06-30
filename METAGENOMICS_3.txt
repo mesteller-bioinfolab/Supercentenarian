@@ -1,0 +1,28 @@
+#Generation of merged taxonomy files from otu and tax informations from centenial and curatedMetagenomicData elder dataset 
+	load in a single spreadsheet sheet taxonomy and counts for every ASV recovered in centenial and curatedMetagenomicData elder dataset
+	keep only those ASV with same taxonomic classification at Phylum, Family and Genus levels
+	compute relative abundance for each taxonomic level classification and recovered ASV
+	save information in a separated plain text file (e.g., 117years.elderStudyDeftse.merge.glomPhylum.otu.tax.table.4plot.txt)
+
+#Taxonomy bar plots at Phylum, Family and Genus levels for both centenial data and curatedMetagenomicData elder people dataset splitted by gender in a single analysis
+#phylum level
+> phylum.diversity.def<-read.table("117years.elderStudyDeftse.merge.glomPhylum.otu.tax.table.4plot.txt",sep="\t",dec=",",header=TRUE)
+> head(phylum.diversity.def)
+> phylum.diversity.def.plot<-ggplot(phylum.diversity.def,aes(x=gender,y=value,fill=Phylum))+geom_bar(stat="identity",position="stack")+ylim(0,100)+labs(y="relative abundance",x="group of subjects")+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10),axis.text.y=element_text(size=8),legend.text=element_text(size=8),legend.title=element_text(size=8))
+> phylum.diversity.def.plot
+> ggsave(phylum.diversity.def.plot,file="phylum.diversity.definitive.plot.png",device="png",dpi=300)
+
+#family level
+> family.diversity.def<-read.table("117years.elderStudyDeftse.merge.glomFamily.otu.tax.table.4plot.txt",sep="\t",dec=",",header=TRUE)
+> family.diversity.def
+> family.diversity.def.plot<-ggplot(family.diversity.def,aes(x=gender,y=value,fill=family))+geom_bar(stat="identity",position="stack")+ylim(0,100)+labs(y="relative abundance",x="group of subjects")+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10),axis.text.y=element_text(size=8),legend.text=element_text(size=8),legend.title=element_text(size=8))
+> family.diversity.def.plot
+> ggsave(family.diversity.def.plot,file="family.diversity.definitive.plot.png",device="png",dpi=300)
+
+#genus level
+> genus.diversity.def<-read.table("117years.elderStudyDeftse.merge.glomGenus.otu.tax.table.4plot.txt",sep="\t",dec=",",header=TRUE)
+> head(genus.diversity.def)
+> genus.diversity.def.plot<-ggplot(genus.diversity.def,aes(x=gender,y=value,fill=genus))+geom_bar(stat="identity",position="stack")+ylim(0,100)+labs(y="relative abundance",x="group of subjects")+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10),axis.text.y=element_text(size=8),legend.text=element_text(size=8),legend.title=element_text(size=8))
+> genus.diversity.def.plot
+> ggsave(genus.diversity.def.plot,file="genus.diversity.definitive.plot.png",device="png",dpi=300)
+

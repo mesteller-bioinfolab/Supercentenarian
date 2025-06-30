@@ -1,0 +1,322 @@
+#Microbiome data analyses of centenial sequencing reads
+#all process are run in a R software environment in a linux based computer except contrary stated
+
+#load R
+$ sudo R
+
+#get and set working directory
+> getwd()
+> setwd("path_to_folder")
+
+#load libraries
+library("dada2");library("phyloseq");library("tidyverse");library("readxl");library("Biostrings");library("phangorn");library("ape");library("microbiome");library("vegan");library("DESeq2");library("genefilter");library("btools");library("xtable");library("scales");library("devtools");library("gridExtra");library("UpSetR");library("VennDiagram");library("MicrobiotaProcess");library("labeling");library("farver");library("ggridges");library("curatedMetagenomicData");library("mia");library("cowplot");library("grid");library("microshades");library("scater");library("stringr");library("DT");library("table1");library(Tax4Fun2);library("ggpicrust2");library("ggh4x");library("reshape2");library("RcppZiggurat");library("readr");library("ALDEx2");library("compositions");library("readr");library("tibble");library("ggprism");library("patchwork");library("scater");library("stringr");library("ecodist");library("knitr")
+
+#set path
+> path<-"path_to_folder"
+
+#set seed
+> set.seed(1234)
+
+#set theme for plotting
+> theme_set(theme_classic())
+
+#DADA2 tutorial (https://benjjneb.github.io/dada2/tutorial.html)
+#Read reads and string manipulation to get matched list of the forward and reverse fastq files
+> fnFs<-sort(list.files(path,pattern="_R1_001.fastq",full.names=TRUE))
+> fnRs<-sort(list.files(path,pattern="_R2_001.fastq",full.names=TRUE))
+
+#Extract sample names, assuming filenames have format: SAMPLENAME_XXX.fastq
+> sample.names<-sapply(strsplit(basename(fnFs),"_"), '[', 1)
+> sample.names
+
+#Read quality profile inspection, for both Forward and Reverse reads. [1:4] allows for plotting output of the first 4 samples in a 2x2 frame. Images must be saved as screen captures.
+> plotQualityProfile(fnFs[1:4])
+> plotQualityProfile(fnRs[1:4])
+
+#Filter and Trim reads and assign the filenames for the filtered fastq.gz files
+> filtFs<-file.path(path,"filtered",paste0(sample.names,"_F_filt.fastq.gz"))
+> filtRs<-file.path(path,"filtered",paste0(sample.names,"_R_filt.fastq.gz"))
+> names(filtFs)<-sample.names
+> names(filtRs)<-sample.names
+> out.117.y5<-filterAndTrim(fnFs,filtFs,fnRs,filtRs,truncLen=c(247,237),maxN=0,maxEE=c(1,3),truncQ=2,rm.phix=TRUE,compress=TRUE,multithread=TRUE)
+> head(out.117.y5)
+
+#Export information on reads included or excluded of analyses
+> report.out.117.y5<-data.frame(out.117.y5)
+> write.table(report.out.117.y5,file="117years_.report.out5.table.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+
+#Learn error rates and visualize them as per dada2 pipeline. Images must be saved as screen captures.
+> errF5<-learnErrors(filtFs,multithread=TRUE)
+> plot.errF5.117years<-plotErrors(errF5,nominalQ=TRUE)
+> plot.errF5.117years
+> errR5<-learnErrors(filtRs,multithread=TRUE)
+> plot.errR5.117years<-plotErrors(errR5,nominalQ=TRUE)
+> plot.errR5.117years
+
+#Sample inference. Infer the sequence variants in each sample. Data inspection.
+> dadaFs<-dada(filtFs,err=errF5,multithread=TRUE)
+> dadaFs[[1]]
+> dadaRs<-dada(filtRs,err=errR5,multithread=TRUE)
+> dadaRs[[1]]
+
+#Merge paired reads and inspect the mergers data.frame for the first sample.
+> mergers5<-mergePairs(dadaFs,filtFs,dadaRs,filtRs,verbose=TRUE)
+> head(mergers5[[1]])
+
+#Construct a sequence table, a matrix (rows corresponding to and named as the samples, and columns corresponding to and named as the sequence variants) of samples and ASV.
+> seqtab.y5<-makeSequenceTable(mergers5)
+> dim(seqtab.y5)
+
+#Inspect the distribution of the sequences according to length and construct a histogram plot
+> table(nchar(getSequences(seqtab.y5)))
+> hist(nchar(getSequences(seqtab.y5)),xlab="size",ylab="frequency",main="reads length 117y y5")
+
+#Chimera detection and removal.
+> seqtab.nochim.y5<-removeBimeraDenovo(seqtab.y5,method="consensus",multithread=TRUE,verbose=TRUE)
+> dim(seqtab.nochim.y5)
+
+#Inspect the distribution of the non-chimeric sequences according to length and construct a histogram plot
+> table(nchar(getSequences(seqtab.nochim.y5)))
+> hist(nchar(getSequences(seqtab.nochim.y5)),xlab="size",ylab="frequency",main="reads length 117y y5 no chim")
+
+#Fraction of chimera detected
+sum(seqtab.nochim.y5)/sum(seqtab.y5)
+
+#Track reads through the pipeline. Final check of the process returning a table of input/filtered/denoised/merged/tabled/nonchim sequences in each sample.
+> getNy5<-function(x) sum(getUniques(x))
+> track.y5<-cbind(out.117.y5,sapply(dadaFs,getNy5),sapply(dadaRs,getNy5),sapply(mergers5,getNy5),rowSums(seqtab.nochim.y5))
+> colnames(track.y5)<-c("input","filtered","denoisedF","denoisedR","merged","non.chimeric")
+> track.y5.report<-data.frame(track.y5)
+> write.table(track.y5.report,"117years_.track.y5.reads.report.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+
+#Taxonomy. DADA2 taxonomic assignation.
+> taxa.y5<-assignTaxonomy(seqtab.nochim.y5,"path_to_folder/references_dada2/silva_nr99_v138.1_train_set.fa",multithread=TRUE)
+> taxa.y5.print<-taxa.y5
+> rownames(taxa.y5.print)<-NULL
+> head(taxa.y5.print)
+> write.table(taxa.y5,file="117years_.y5.taxonomy.table.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+> write.table(seqtab.nochim.y5,file="117years_.y5.seqtab.nochim.table.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+
+#Microbiome data analysis using the phyloseq package (https://joey711.github.io/phyloseq/).
+#phyloseq object construction
+> samdf<-read.csv("117years.metadata2.txt",sep="\t",dec=",",row.names=1) #read metadata file
+> head(samdf)
+> OTU=otu_table(seqtab.nochim.y5,taxa_are_rows=FALSE)
+> TAXA=phyloseq::tax_table(taxa.y5)
+> c.117y.y5<-phyloseq(OTU,TAXA,sample_data(samdf))
+> c.117y.y5
+
+#renaming ASV, use short string (e.g., ASV) rather than the full DNA sequence
+> dna.y5<-Biostrings::DNAStringSet(taxa_names(c.117y.y5))
+> names(dna.y5)<-taxa_names(c.117y.y5)
+> c.117y.y5<-merge_phyloseq(c.117y.y5,dna.y5)
+> taxa_names(c.117y.y5)<-paste0("asv",seq(ntaxa(c.117y.y5)))
+> c.117y.y5
+
+#generate and export otu and taxonomy tables
+> c.117y.y5.otu.table<-data.frame(phyloseq::otu_table(c.117y.y5))
+> c.117y.y5.tax.table<-data.frame(phyloseq::tax_table(c.117y.y5))
+> write.table(c.117y.y5.otu.table,file="117years_.y5.otu.table.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+> write.table(c.117y.y5.tax.table,file="117years_.y5.tax.table.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+
+#remove ASV with 0 counts and construct new phyloseq object
+> any(taxa_sums(c.117y.y5)==0) #TRUE, need to remove such ASV. Desired answer must be FALSE
+> sum(taxa_sums(c.117y.y5)==0) #number of ASV not present in any sample
+> c.117y.y5.clean1<-prune_taxa(taxa_sums(c.117y.y5)>0,c.117y.y5) #to remove any non-existing ASV in the phyloseq object
+> c.117y.y5.clean1<-subset_taxa(c.117y.y5,Class!="Incertae Sedis")
+> c.117y.y5.clean1
+
+#verification
+> any(taxa_sums(c.117y.y5.clean1)==0)
+> sum(taxa_sums(c.117y.y5.clean1)==0)
+
+#generate and export new otu and taxonomy tables
+> c.117y.y5.clean1.otu.table<-data.frame(phyloseq::otu_table(c.117y.y5.clean1))
+> c.117y.y5.clean1.tax.table<-data.frame(phyloseq::tax_table(c.117y.y5.clean1))
+> write.table(c.117y.y5.clean1.otu.table,file="117years_.y5.clean1.otu.table.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+> write.table(c.117y.y5.clean1.tax.table,file="117years_.y5.clean1.tax.table.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+
+#plot visual distribution of ASVs
+> readsumsdf=data.frame(nreads=sort(taxa_sums(c.117y.y5.clean1),TRUE),sorted=1:ntaxa(c.117y.y5.clean1),type="ASVs")
+> readsumsdf=rbind(readsumsdf,data.frame(nreads=sort(sample_sums(c.117y.y5.clean1),TRUE),sorted=1:nsamples(c.117y.y5.clean1),type="samples"))
+> title="total number of good quality reads in 117y y5 dataset"
+> c.117years_.y5.clean1.Read.Distribution<-ggplot(readsumsdf,aes(x=sorted,y=nreads))+geom_bar(stat="identity")+ggtitle(title)+scale_y_log10(labels=trans_format("log10",math_format(10^.x)))+facet_wrap(~type,1,scales="free")
+> c.117years_.y5.clean1.Read.Distribution
+> ggsave(c.117years_.y5.clean1.Read.Distribution,file="117years_.y5.clean1.Read.Distribution.png",device="png",dpi=300)
+
+#export reference sequences from phyloseq to generate aligned tree
+> c.117years_.y5.clean1.refseq<-refseq(c.117y.y5.clean1)
+> write.table(c.117years_.y5.clean1.refseq,file="117years_.y5.clean1.refseq.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+
+#convert to fasta file and generation of 16S rDNA gene alingment and tree construction using sina (https://www.arb-silva.de/aligner/sina-download/) and fasttree (https://morgannprice.github.io/fasttree/) tools
+#in a text editor
+open reference sequence file (117years_.y5.clean1.refseq.txt) and replace quotations ("") by fasta sign (>)
+save resulting file as fasta (117years_.y5.clean1.refseq.fasta)
+
+#create conda environment for sina and run sina aligner
+(base) digestiu@digestiu-Precision-WorkStation-T5500:~$ conda config --add channels bioconda
+(base) digestiu@digestiu-Precision-WorkStation-T5500:~$ conda config --add channels conda-forge
+(base) digestiu@digestiu-Precision-WorkStation-T5500:~$ conda config --set channel_priority strict
+(base) digestiu@digestiu-Precision-WorkStation-T5500:~$ conda create -n sina sina
+(base) digestiu@digestiu-Precision-WorkStation-T5500:~$ conda activate sina
+(sina) digestiu@digestiu-Precision-WorkStation-T5500:~$ sina -i /path_to_folder/117years_.y5.clean1.refseq.fasta -r /path_to_folder/references_dada2/SILVA_138.1_SSURef_NR99_12_06_20_opt.arb -o /path_to_folder/117years_.y5.clean1.refseq.aligned.fasta
+
+#construct phylogenetic tree using fasttree tool
+(base) digestiu@digestiu-Precision-WorkStation-T5500:~$ fasttree -gamma -nt /path_to_folder/117years_.y5.clean1.refseq.aligned.fasta > /path_to_folder/117years_.y5.clean1.refseq.aligned.tree
+
+#import phylogenetic tree to R and incorporate it to phyloseq object
+> c.117y.y5.clean1.refseq.tree<-read.tree("117years_.y5.clean1.refseq.aligned.tree")
+> c.117y.y5.clean1.refseq.tree
+> c.117y.y5.clean1.tree=phyloseq::merge_phyloseq(c.117y.y5.clean1,c.117y.y5.clean1.refseq.tree)
+> c.117y.y5.clean1
+> c.117y.y5.clean1.tree
+
+#recover information on sample data and summarize phyloseq object
+> sample_data(c.117y.y5.clean1.tree)
+> summarize_phyloseq(c.117y.y5.clean1.tree)
+
+
+#Alpha Diversity analyses
+#generation of richness estimates from phyloseq object
+> head(estimate_richness(c.117y.y5.clean1.tree))
+> c.117years_.y5.clean1.tree.div.table<-estimate_richness(c.117y.y5.clean1.tree,split=TRUE,measures=c("Observed","Chao","Shannon","ACE","Simpson","InvSimpson","Fisher"))
+> c.117years_.y5.clean1.tree.div.table
+> write.table(c.117years_.y5.clean1.tree.div.table,file="117years_.y5.clean1.tree.diversity.table.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+
+#generate alpha diversity plots
+> c.117years_.y5.clean1.tree.div.plot<-plot_richness(c.117y.y5.clean1.tree,x="time2",measures=c("Observed","Chao1","Shannon"),color="time2")+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10))
+> c.117years_.y5.clean1.tree.div.plot
+> ggsave(c.117years_.y5.clean1.tree.div.plot,file="117years_.y5.clean1.tree.alpha.diversity.plot.png",device="png",dpi=300)
+
+> c.117years_.y5.clean1.tree.div.plot2<-plot_richness(c.117y.y5.clean1.tree,x="group",measures=c("Observed","Chao1","Shannon"),color="time2")+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10))
+> c.117years_.y5.clean1.tree.div.plot2
+> ggsave(c.117years_.y5.clean1.tree.div.plot2,file="117years_.y5.clean1.tree.alpha.diversity.plot2.png",device="png",dpi=300)
+
+> c.117years_.y5.clean1.tree.div.plot4<-plot_richness(c.117y.y5.clean1.tree,x="group",measures=c("Observed","Chao1","Shannon"),color="group")+geom_boxplot(aes(fill="group"),alpha=0.2)+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10))
+> c.117years_.y5.clean1.tree.div.plot4
+> ggsave(c.117years_.y5.clean1.tree.div.plot4,file="117years_.y5.clean1.tree.alpha.diversity.plot4.png",device="png",dpi=300)
+
+#rarefaction curves
+> otuTab4rarecurve<-as(t(phyloseq::otu_table(c.117y.y5.clean1.tree)),"matrix")
+> class(otuTab4rarecurve)
+> c.117years_.y5.clean1.tree.rarecurve<-rarecurve(t(otuTab4rarecurve),step=50,cex=0.5,ylab="number of ASVs",main="rarefaction curve for 117years old women samples")
+> png(file="117years_.y5.clean1.tree.rarefaction.curve.png")
+
+> dev.off()
+
+#taxonomy bar plot with relative abundance data at different taxonomic levels
+> c.117y.y5.clean1.tree.rel.abund<-transform_sample_counts(c.117y.y5.clean1.tree,function(x) 100*x/sum(x))
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.phylum<-plot_bar(c.117y.y5.clean1.tree.rel.abund,x="time2",fill="Phylum")+geom_bar(aes(),stat="identity",position="stack")+theme(axis.title.x=element_blank(),axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10),legend.text=element_text(size=8),legend.title=element_text(size=8))
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.phylum
+> ggsave(c.117years_.y5.clean1.tree.rel.abund.bar.plot.phylum,file="117years_.y5.clean1.tree.rel.abund.bar.plot.phylum.png",device="png",dpi=300)
+
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.class<-plot_bar(c.117y.y5.clean1.tree.rel.abund,x="time2",fill="Class")+geom_bar(aes(),stat="identity",position="stack")+theme(axis.title.x=element_blank(),axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10),legend.text=element_text(size=8),legend.title=element_text(size=8))
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.class
+> ggsave(c.117years_.y5.clean1.tree.rel.abund.bar.plot.class,file="117years_.y5.clean1.tree.rel.abund.bar.plot.class.png",device="png",dpi=300)
+
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.order<-plot_bar(c.117y.y5.clean1.tree.rel.abund,x="time2",fill="Order")+geom_bar(aes(),stat="identity",position="stack")+theme(axis.title.x=element_blank(),axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10),legend.text=element_text(size=8),legend.title=element_text(size=8))
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.order
+> ggsave(c.117years_.y5.clean1.tree.rel.abund.bar.plot.order,file="117years_.y5.clean1.tree.rel.abund.bar.plot.order.png",device="png",dpi=300)
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.family<-plot_bar(c.117y.y5.clean1.tree.rel.abund,x="time2",fill="Family")+geom_bar(aes(),stat="identity",position="stack")+theme(axis.title.x=element_blank(),axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10),legend.text=element_text(size=8),legend.title=element_text(size=8))
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.family
+> ggsave(c.117years_.y5.clean1.tree.rel.abund.bar.plot.family,file="117years_.y5.clean1.tree.rel.abund.bar.plot.family.png",device="png",dpi=300)
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.genus<-plot_bar(c.117y.y5.clean1.tree.rel.abund,x="time2",fill="Genus")+geom_bar(aes(),stat="identity",position="stack")+theme(axis.title.x=element_blank(),axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10),legend.text=element_text(size=4),legend.title=element_text(size=6))
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.genus
+> ggsave(c.117years_.y5.clean1.tree.rel.abund.bar.plot.genus,file="117years_.y5.clean1.tree.rel.abund.bar.plot.genus.png",device="png",dpi=300)
+
+#generation of top X plots
+> top100y5<-names(sort(phyloseq::taxa_sums(c.117y.y5.clean1.tree),decreasing=TRUE))[1:100]
+> top10y5<-names(sort(phyloseq::taxa_sums(c.117y.y5.clean1.tree),decreasing=TRUE))[1:10]
+> c.117y.y5.clean1.tree.rel.abund.top100<-prune_taxa(top100y5,c.117y.y5.clean1.tree.rel.abund)
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.family.top100<-plot_bar(c.117y.y5.clean1.tree.rel.abund.top100,x="time2",fill="Family",title="top 100 ASVs @Family")+ylab("percentage of retrieved sequences")+ylim(0,100)+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=8))
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.family.top100
+> ggsave(c.117years_.y5.clean1.tree.rel.abund.bar.plot.family.top100,file="117years_.y5.clean1.tree.rel.abund.bar.plot.family.top100.png",device="png",dpi=300)
+
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.genus.top100<-plot_bar(c.117y.y5.clean1.tree.rel.abund.top100,x="time2",fill="Genus",title="top 100 ASVs @Genus")+ylab("percentage of retrieved sequences")+ylim(0,100)+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=8))
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.genus.top100
+> ggsave(c.117years_.y5.clean1.tree.rel.abund.bar.plot.genus.top100,file="117years_.y5.clean1.tree.rel.abund.bar.plot.genus.top100.png",device="png",dpi=300)
+
+> top10percenty5<-names(sort(phyloseq::taxa_sums(c.117y.y5.clean1.tree),decreasing=TRUE))[1:185]
+> c.117y.y5.clean1.tree.rel.abund.top10percenty5<-prune_taxa(top10percenty5,c.117y.y5.clean1.tree.rel.abund)
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.family.top10percent<-plot_bar(c.117y.y5.clean1.tree.rel.abund.top10percenty5,x="time2",fill="Family",title="top 10% ASVs @Family")+ylab("percentage of retrieved sequences")+ylim(0,100)+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=8))
+> ggsave(c.117years_.y5.clean1.tree.rel.abund.bar.plot.family.top10percent,file="117years_.y5.clean1.tree.rel.abund.bar.plot.family.top10perCent.png",device="png",dpi=300)
+
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.genus.top10percent<-plot_bar(c.117y.y5.clean1.tree.rel.abund.top10percenty5,x="time2",fill="Genus",title="top 10% ASVs @Genus")+ylab("percentage of retrieved sequences")+ylim(0,100)+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=8))
+> c.117years_.y5.clean1.tree.rel.abund.bar.plot.genus.top10percent
+> ggsave(c.117years_.y5.clean1.tree.rel.abund.bar.plot.genus.top10percent,file="117years_.y5.clean1.tree.rel.abund.bar.plot.genus.top10perCent.png",device="png",dpi=300)
+
+
+#How many sahred ASVs are per sample? generation of UpsetR plots
+> upset.117y.y5<-get_upset(obj=c.117y.y5.clean1.tree,factorNames="time2")
+> c.117years_.y5.clean1.tree.upset.plot<-upset(upset.117y.y5,sets=c("1d","2d","7d"),order.by="freq",number.angles=30,keep.order=TRUE,empty.intersections="on",mainbar.y.label="ASVs")
+> c.117years_.y5.clean1.tree.upset.plot
+> png(file="117years_.y5.clean1.tree.upset.plot.png")
+> c.117years_.y5.clean1.tree.upset.plot
+> dev.off()
+
+#analyses to generate clr transformations of ASV counts and generate Beta diversity plots
+#generated clr transformations of ASV counts
+> c.117y.y5.clean1.tree.tse<-makeTreeSummarizedExperimentFromPhyloseq(c.117y.y5.clean1.tree)
+> c.117y.y5.clean1.tree.tse<-transformAssay(c.117y.y5.clean1.tree.tse,assay.type="counts",method="clr",pseudocount=TRUE)
+> clr_assay.y5<-assays(c.117y.y5.clean1.tree.tse)$clr
+> clr_assay.y5<-t(clr_assay.y5)
+
+#generate distance matrix from clr counts
+> euclidean_dist.y5<-vegan::vegdist(clr_assay.y5,method="euclidean")
+> euclidean_pcoa.y5<-ecodist::pco(euclidean_dist.y5)
+> euclidean_pcoa.y5_df<-data.frame(pcoa1=euclidean_pcoa.y5$vectors[,1],pcoa2=euclidean_pcoa.y5$vectors[,2])
+> euclidean_pcoa.y5_df_data<-cbind(euclidean_pcoa.y5_df,Group=colData(c.117y.y5.clean1.tree.tse)$time2)
+
+#generate metadata file for statistical purposes
+> metadata.y5=data.frame(sample_data(c.117y.y5.clean1.tree))
+
+#generate PERMANOVA analyses from clr transformed data and metadata
+> permanova.y5<-adonis2(euclidean_dist.y5~time2,data=metadata.y5,permutations=10000)
+> permanova.y5
+> c.117y.y5.clean1.tree.permanova<-data.frame(permanova.y5)
+> write.table(c.117y.y5.clean1.tree.permanova,file="117years_.y5.clean1.tree.clr.permanova.values.txt",sep="\t",row.names=TRUE,col.names=TRUE)
+
+#plotting
+> c.117y.y5.clean1.tree.pcoa.aitchison<-ggplot(euclidean_pcoa.y5_df_data,aes(pcoa1,pcoa2,color=c.117y.y5.clean1.tree.tse$time2,shape=c.117y.y5.clean1.tree.tse$time2))+geom_point(size=4)+labs(x="PCA1",y="PCA2",title="PCA aitchison distance",subtitle="permanova: R2=1, p=na")+theme(title=element_text(size=12),legend.title=element_blank(),legend.text=element_text(size=8))
+> c.117y.y5.clean1.tree.pcoa.aitchison
+> ggsave(c.117y.y5.clean1.tree.pcoa.aitchison,file="117years_.y5.clean1.tree.pcoa.clr.aitchison.permanova.png",device="png",dpi=300)
+
+#beta diversity analyses using weighted unifrac distance
+> ordPCoA.y5=ordinate(c.117y.y5.clean1.tree.rel.abund,method="PCoA",distance="unifrac",weighted=TRUE)
+> c.117y.y5.clean1.tree.rel.abund.pcoa.weighted.unifrac<-plot_ordination(c.117y.y5.clean1.tree.rel.abund,ordPCoA.y5,color="time2",shape="time2",title="weighted unifrac")+geom_point(size=3,alpha=0.4)
+> c.117y.y5.clean1.tree.rel.abund.pcoa.weighted.unifrac
+> ggsave(c.117y.y5.clean1.tree.rel.abund.pcoa.weighted.unifrac,file="117years_.y5.clean1.tree.rel.abund.pcoa.weighted.unifrac.png",device="png",dpi=300)
+
+#merge samples from centenial dataset according to gender
+> c.117y.y5.clean1.tree
+> c.117y.y5.clean1.tree.merge=merge_samples(c.117y.y5.clean1.tree,"group")
+> c.117y.y5.clean1.tree.merge
+
+#agglomerate centenial dataset data at Phylum, Family and genus levels and merge samples
+
+> c.117y.y5.clean1.tree.merge.glomPhylum<-phyloseq::tax_glom(c.117y.y5.clean1.tree.merge,tax_rank="Phylum")
+> c.117y.y5.clean1.tree.merge.glomPhylum
+
+> c.117y.y5.clean1.tree.merge.glomFamily<-phyloseq::tax_glom(c.117y.y5.clean1.tree.merge,tax_rank="Fammily")
+> c.117y.y5.clean1.tree.merge.glomFamily
+
+> c.117y.y5.clean1.tree.merge.glomGenus<-phyloseq::tax_glom(c.117y.y5.clean1.tree.merge,tax_rank="Genus")
+> c.117y.y5.clean1.tree.merge.glomGenus
+
+
+#export taxonomy and ASV table to a file
+> c.117y.y5.clean1.tree.merge.glomPhylum.otu.table<-data.frame(phyloseq::otu_table(c.117y.y5.clean1.tree.merge.glomPhylum))
+> c.117y.y5.clean1.tree.merge.glomPhylum.tax.table<-data.frame(phyloseq::tax_table(c.117y.y5.clean1.tree.merge.glomPhylum))
+> write.table(c.117y.y5.clean1.tree.merge.glomPhylum.otu.table,file="117years_.y5.clean1.tree.merge.glomPhylum.otu.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+> write.table(c.117y.y5.clean1.tree.merge.glomPhylum.tax.table,file="117years_.y5.clean1.tree.merge.glomPhylum.tax.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+
+> c.117y.y5.clean1.tree.merge.glomFamily.otu.table<-data.frame(phyloseq::otu_table(c.117y.y5.clean1.tree.merge.glomFamily))
+> c.117y.y5.clean1.tree.merge.glomFamily.tax.table<-data.frame(phyloseq::tax_table(c.117y.y5.clean1.tree.merge.glomFamily))
+> write.table(c.117y.y5.clean1.tree.merge.glomFamily.otu.table,file="117years_.y5.clean1.tree.merge.glomFamily.otu.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+> write.table(c.117y.y5.clean1.tree.merge.glomFamily.tax.table,file="117years_.y5.clean1.tree.merge.glomFamily.tax.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+
+> c.117y.y5.clean1.tree.merge.glomGenus.otu.table<-data.frame(phyloseq::otu_table(c.117y.y5.clean1.tree.merge.glomGenus))
+> c.117y.y5.clean1.tree.merge.glomGenus.tax.table<-data.frame(phyloseq::tax_table(c.117y.y5.clean1.tree.merge.glomGenus))
+> write.table(c.117y.y5.clean1.tree.merge.glomGenus.otu.table,file="117years_.y5.clean1.tree.merge.glomGenus.otu.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+> write.table(c.117y.y5.clean1.tree.merge.glomGenus.tax.table,file="117years_.y5.clean1.tree.merge.glomGenus.tax.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+

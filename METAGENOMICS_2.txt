@@ -1,0 +1,115 @@
+##CMD & Bifidobacterium
+#generation of a microbiome dataset from curatedMetagenomicData package containing old healthy people
+> elderStudyDef <-
+    filter(sampleMetadata, age_category =="senior") |>
+    filter(disease== "healthy") |>
+    filter(antibiotics_current_use !="yes") |>
+    filter(body_site == "stool") |>
+    select(where(~ !all(is.na(.x))))
+> class(elderStudyDef)
+> dim(elderStudyDef)
+> write.table(elderStudyDef,file="curatedMetagenomicData.elderStudyDef.dataframe.txt",sep="\t",row.names=FALSE)
+
+> elderStudyDeftse <-
+    filter(sampleMetadata, age_category =="senior") |>
+    filter(disease== "healthy") |>
+    filter(antibiotics_current_use !="yes") |>
+    filter(body_site == "stool") |>
+    select(where(~ !all(is.na(.x)))) |>
+    returnSamples("relative_abundance",rownames="long")
+
+> colData(elderStudyDeftse) <-
+    colData(elderStudyDeftse) |>
+    as.data.frame() |>
+    mutate(antibiotics_current_use = str_replace_all(antibiotics_current_use, "no", "No")) |>
+    mutate(gender = str_replace_all(gender, "male", "Male")) |>
+    mutate(gender = str_replace_all(gender, "female", "Female")) |>
+    mutate(non_westernized = str_replace_all(non_westernized, "no", "No")) |>
+    mutate(non_westernized = str_replace_all(non_westernized, "yes", "Yes")) |>
+    DataFrame()
+> altExps(elderStudyDeftse)<-splitByRanks(elderStudyDeftse)
+
+> class(elderStudyDeftse)
+> dim(elderStudyDeftse)
+> write.table(elderStudyDeftse,file="curatedMetagenomicData.elderStudyDeftse.dataframe.txt",sep="\t",row.names=FALSE)
+
+#generation of a alpha diversity plot from elder data from curatedMetagenomicData package
+> elderStudyDeftse.divesity.shannon.plot<-elderStudyDeftse |>
+    estimateDiversity(assay.type = "relative_abundance", index = "shannon") |>
+    plotColData(x = "gender", y = "shannon", colour_by = "gender", shape_by = "gender") +
+    labs(x = "Gender", y = "Alpha Diversity (H')") +
+    guides(colour = guide_legend(title = "Gender"), shape = guide_legend(title = "Gender")) +
+    theme(legend.position = "none")
+> elderStudyDeftse.divesity.shannon.plot
+> ggsave(elderStudyDeftse.divesity.shannon.plot,file="curatedMetagenomicData.elderStudyDeftse.diversity.shannon.plot.png",device="png",dpi=300)
+
+#generation of a beta diversity plot from elder data from curatedMetagenomicData package
+> elderStudyDeftse.pcoa.BrayCurtis.plot<-elderStudyDeftse |>
+    runMDS(FUN = vegdist, method = "bray", exprs_values = "relative_abundance", altexp = "genus", name = "BrayCurtis") |>
+    plotReducedDim("BrayCurtis", colour_by = "gender", shape_by = "gender") +
+    labs(x = "PCo 1", y = "PCo 2") +
+    guides(colour = guide_legend(title = "Gender"), shape = guide_legend(title = "Gender")) +
+    theme(legend.position.inside= c(0.90, 0.85))
+> elderStudyDeftse.pcoa.BrayCurtis.plot
+> ggsave(elderStudyDeftse.pcoa.BrayCurtis.plot,file="curatedMetagenomicData.elderStudyDeftse.PCoA.BrayCurtis.plot.png",device="png",dpi=300)
+
+> elderStudyDeftse.umap.plot<-elderStudyDeftse |>
+    runUMAP(exprs_values = "relative_abundance", altexp = "genus", name = "UMAP") |>
+    plotReducedDim("UMAP", colour_by = "gender", shape_by = "gender") +
+    labs(x = "UMAP 1", y = "UMAP 2") +
+    guides(colour = guide_legend(title = "Gender"), shape = guide_legend(title = "Gender")) +
+    theme(legend.position.inside= c(0.90, 0.85))
+> elderStudyDeftse.umap.plot
+> ggsave(elderStudyDeftse.umap.plot,file="curatedMetagenomicData.elderStudyDeftse.umap.plot.png",device="png",dpi=300)
+
+#as curatedMetagenomicData output is not suitable for downstream analyses, we convert this data into a phyloseq object
+> elderStudyDeftse.phyloseq<-makePhyloseqFromTreeSummarizedExperiment(elderStudyDeftse,assay.type="relative_abundance")
+> elderStudyDeftse.phyloseq
+> sample_data(elderStudyDeftse.phyloseq)
+
+#alpha diversity indices plot from elder data from curatedMetagenomicData according to phyloseq concept
+> elderStudyDeftse.phyloseq.alpha2<-plot_richness(elderStudyDeftse.phyloseq,x="gender",measures=c("Shannon","Simpson"),color="gender")+geom_boxplot(aes(fill="gender"),alpha=0.2)+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=10))
+> elderStudyDeftse.phyloseq.alpha2
+> ggsave(elderStudyDeftse.phyloseq.alpha2,file="curatedMetagenomicData.elderStudyDeftse.phyloseq.alpha.diversity.plot2.png",device="png",dpi=300)
+
+#merge samples from elderStudy dataset according to gender
+> elderStudyDeftse.phyloseq.merge=merge_samples(elderStudyDeftse.phyloseq,"gender")
+> elderStudyDeftse.phyloseq.merge
+
+#compute relative abundance
+> elderStudyDeftse.phyloseq.merge.rel.abund=transform_sample_counts(elderStudyDeftse.phyloseq.merge,function(x) 100*x/sum(x))
+
+#barplot from elderStudy dataset relative abundance
+> elderStudyDeftse.phyloseq.merge.rel.abund.bifido.barplot<-plot_bar(elderStudyDeftse.phyloseq.merge.rel.abunde.bifido,fill="genus")+ylim(0,100)+ylab("percentage of retrieved sequences")+xlab("Gender")+theme(axis.text.x=element_text(hjust=1,vjust=1,angle=45,size=8),legend.text=element_text(size=8),legend.title=element_text(size=8))
+> elderStudyDeftse.phyloseq.merge.rel.abund.bifido.barplot
+> ggsave(elderStudyDeftse.phyloseq.merge.rel.abund.bifido.barplot,file="curatedMetagenomicData.elderStudyDeftse.phyloseq.merge.rel.abund.bifido.barplot.png",device="png",dpi=300)
+
+
+#agglomerate elderStudyDeftse data at Phylum, Family and genus levels and merge samples
+
+> elderStudyDeftse.phyloseq.merge.glomPhylum<-phyloseq::tax_glom(elderStudyDeftse.phyloseq.merge,tax_rank="phylum")
+> elderStudyDeftse.phyloseq.merge.glomPhylum
+
+> elderStudyDeftse.phyloseq.merge.glomFamily<-phyloseq::tax_glom(elderStudyDeftse.phyloseq.merge,tax_rank="fammily")
+> elderStudyDeftse.phyloseq.merge.glomFamily
+
+> elderStudyDeftse.phyloseq.merge.glomGenus<-phyloseq::tax_glom(elderStudyDeftse.phyloseq.merge,tax_rank="genus")
+> elderStudyDeftse.phyloseq.merge.glomGenus
+
+
+#export taxonomy and ASV table to a file
+> elderStudyDeftse.phyloseq.merge.glomPhylum.otu.table<-data.frame(phyloseq::otu_table(elderStudyDeftse.phyloseq.merge.glomPhylum))
+> elderStudyDeftse.phyloseq.merge.glomPhylum.tax.table<-data.frame(phyloseq::tax_table(elderStudyDeftse.phyloseq.merge.glomPhylum))
+> write.table(elderStudyDeftse.phyloseq.merge.glomPhylum.otu.table,file="elderStudyDeftse.phyloseq.merge.glomPhylum.otu.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+> write.table(elderStudyDeftse.phyloseq.merge.glomPhylum.tax.table,file="elderStudyDeftse.phyloseq.merge.glomPhylum.tax.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+
+> elderStudyDeftse.phyloseq.merge.glomFamily.otu.table<-data.frame(phyloseq::otu_table(elderStudyDeftse.phyloseq.merge.glomFamily))
+> elderStudyDeftse.phyloseq.merge.glomFamily.tax.table<-data.frame(phyloseq::tax_table(elderStudyDeftse.phyloseq.merge.glomFamily))
+> write.table(elderStudyDeftse.phyloseq.merge.glomFamily.otu.table,file="elderStudyDeftse.phyloseq.merge.glomFamily.otu.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+> write.table(elderStudyDeftse.phyloseq.merge.glomFamily.tax.table,file="elderStudyDeftse.phyloseq.merge.glomFamily.tax.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+
+> elderStudyDeftse.phyloseq.merge.glomGenus.otu.table<-data.frame(phyloseq::otu_table(elderStudyDeftse.phyloseq.merge.glomGenus))
+> elderStudyDeftse.phyloseq.merge.glomGenus.tax.table<-data.frame(phyloseq::tax_table(elderStudyDeftse.phyloseq.merge.glomGenus))
+> write.table(elderStudyDeftse.phyloseq.merge.glomGenus.otu.table,file="elderStudyDeftse.phyloseq.merge.glomGenus.otu.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+> write.table(elderStudyDeftse.phyloseq.merge.glomGenus.tax.table,file="elderStudyDeftse.phyloseq.merge.glomGenus.tax.table.txt",sep="\t",col.names=TRUE,row.names=TRUE)
+

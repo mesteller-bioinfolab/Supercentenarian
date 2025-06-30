@@ -1,0 +1,1375 @@
+---
+title: "MB Distribucions"
+format: html
+editor: visual
+---
+
+## Distribucions 
+
+### DATA LOADING
+
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+library(readxl) 
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(gridExtra)
+library(ggdist)
+library(forcats)
+library(knitr)
+library(kableExtra)
+```
+
+```{r, warning=FALSE, message=FALSE}
+metabolic_data <- read_excel("DIABETES_seguiment_010724.xlsx")
+metadata <- read_excel("24_07_08_SummaryResultsMetBalance_diabetesSeg.xlsx")
+#--------------------
+pobl_risc <- read_excel("DIABETES_identificats 2023_seguiment_LipPols_301024.xlsx")
+
+pobl_risc <- pobl_risc %>% 
+  select(Ids_mostres, `Sample ID BT`, `VLDL-C_seg`, IMC_s, DM2_s, SEX) %>% 
+  mutate(
+    Ids_mostres = as.factor(Ids_mostres),
+    SEX = as.factor(recode(SEX, `1` = "Hombre", `2` = "Mujer")),
+    `Sample ID BT` = as.factor(`Sample ID BT`),
+    DM2_s = as.factor(DM2_s),
+    `VLDL-C_seg` = as.numeric(`VLDL-C_seg`),
+    IMC_s = as.numeric(IMC_s)
+  ) %>% 
+  rename(Sexo = SEX, ID_mostres = Ids_mostres) %>% 
+  filter(IMC_s >= 30, DM2_s == 2)
+
+#--------------------
+
+
+###############################################
+
+print(paste0("Metabolic data SIZE | ", nrow(metabolic_data), " x ", ncol(metabolic_data)))
+print(paste0("Metadata data SIZE | ", nrow(metadata), " x ", ncol(metadata)))
+
+print(paste0("- MISSING: ", nrow(metabolic_data) - nrow(metadata)))
+
+
+```
+
+```{r}
+###############################################
+# Arranging the dfs
+
+metadata_ <- metadata %>% 
+  select(ID_Client, User_name, Edad, Sexo) %>%
+  rename(
+    ID_mostres = ID_Client,
+    Sample_ID_BT_metadata = User_name
+  )
+
+metabolic_data_ <- metabolic_data %>%
+  select(-c(num, Ids_bbdd, Ids_biosfer)) %>% 
+  rename(
+    ID_mostres = Ids_mostres,
+    Sample_ID_BT_metabolicdata = `Sample ID BT`
+  )
+
+###############################################
+# Check for duplicates !
+  
+table(duplicated(metabolic_data_$ID_mostres))
+table(duplicated(metadata_$ID_mostres))
+
+#--------------------------
+# Print the duplicated rows
+duplicated_rows <- metabolic_data_[duplicated(metabolic_data_), ]
+
+print("Duplicated Rows:")
+print(duplicated_rows$Sample_ID_BT_metabolicdata)
+
+###############################################
+# Removing duplicate
+metabolic_data_ <- distinct(metabolic_data_)
+```
+
+```{r}
+data <- merge(metadata_, metabolic_data_, by = "ID_mostres")
+
+###############################################
+# Size of data
+print(paste0("data SIZE | ", nrow(data), " x ", ncol(data)))
+
+# Check that Sample ID BT columns match
+identical_columns <- all.equal(data$Sample_ID_BT_metadata, data$Sample_ID_BT_metabolicdata)
+
+if (isTRUE(identical_columns)) {
+  cat("Sample ID BT columns are IDENTICAL\n")
+} else {
+  cat("Sample ID BT columns are NOT identical:\n")
+  print(identical_columns)
+}
+
+```
+
+```{r}
+# Rearranging data
+data_ <- data %>% 
+  select(-c(Sample_ID_BT_metadata, Sample_ID_BT_metabolicdata)) %>% 
+  mutate(Sexo = as.factor(Sexo),
+         ID_mostres = as.factor(ID_mostres)
+         )
+
+data_[] <- lapply(data_, function(x) {
+  if (is.character(x)) {
+    x[x %in% c("NA", "<LOD")] <- NA  # Replace "NA" and "<LOD" strings with NA
+    return(as.numeric(x))             # Convert to numeric
+  } else {
+    return(x)  # Leave other columns unchanged
+  }
+})   
+```
+
+```{r}
+are_equal <- all.equal(data$`HDL-P (μmol/L)`, data_$`HDL-P (μmol/L)`)
+
+if (isTRUE(are_equal)) {
+  cat("The columns ARE IDENTICAL\n")
+} else {
+  cat("The columns are not equal. Differences:\n", are_equal, "\n")
+}
+```
+
+```{r, echo=FALSE}
+cat("3-Hydroxybutyrate")
+cat('\nNumber of real NAs:', summary(data_$`3-Hydroxybutyrate`)[7])
+cat('\nCounting NA in original dataset', sum(data$`3-Hydroxybutyrate` %in% c("NA", "<LOD")))
+cat("\n\nGlutamine_Glutamate_seg")
+cat('\nNumber of real NAs:', summary(data_$Glutamine_Glutamate_seg)[7]) 
+cat('\nCounting NA in original dataset', sum(data$Glutamine_Glutamate_seg %in% c("NA", "<LOD")))
+
+
+```
+
+**AFEGEIXO SUPERCENTENARIA**
+
+```{r}
+esteller_data <- read_excel("NMR_Metabolomic_Results_EstellerM001_Longevidad.xls", sheet = "complete")
+
+esteller_data$Sexo <- c("Mujer", "Mujer")
+esteller_data$Edad <- c(100, 76)
+
+
+# Rearranging data
+esteller_data_ <- esteller_data %>% 
+  select(-c(`Sample ID BT`)) %>% 
+  rename(ID_mostres = `Sample ID Client`) %>%
+  rename(`Glucose_mg/dl_seg` = Glucose) %>% 
+  mutate(Sexo = as.factor(Sexo),
+         ID_mostres = as.factor(ID_mostres),
+         TotalChol_seg = `VLDL-C` + `IDL-C` + `LDL-C` + `HDL-C`,
+         TotalTGs_seg = `VLDL-TG` + `IDL-TG` + `LDL-TG` + `HDL-TG`,
+         VLDLTG_VLDLC_seg = `VLDL-TG`/`VLDL-C`,
+         IDLTG_IDLC_seg = `IDL-TG`/`IDL-C`,
+         LDLTG_LDLC_seg = `LDL-TG`/`LDL-C`,
+         HDLTG_HDLC_seg = `HDL-TG`/`HDL-C`
+         )
+
+esteller_data_[] <- lapply(esteller_data_, function(x) {
+  if (is.character(x)) {
+    x[x %in% c("NA", "<LOD")] <- NA  # Replace "NA" and "<LOD" strings with NA
+    return(as.numeric(x))             # Convert to numeric
+  } else {
+    return(x)  # Leave other columns unchanged
+  }
+}) 
+
+```
+
+```{r}
+all_data <- bind_rows(data_, esteller_data_)
+```
+
+```{r}
+# calculate for partial data
+data_$remnant <- data_$`VLDL-C`+data_$`IDL-C`
+data_$tg_hdlc <- data_$TotalTGs_seg/data_$`HDL-C`
+data_$vldlpeq <- data_$`Small VLDL-P (nmol/L)`/data_$`VLDL-P (nmol/L)`
+data_$ldlpeq <-  data_$`Small LDL-P (nmol/L)`/data_$`LDL-P (nmol/L)`
+data_$hdlindex <- data_$`HDL-TG`/data_$`HDL-C`
+# calculate for all data
+all_data$remnant <- all_data$`VLDL-C`+all_data$`IDL-C`
+all_data$tg_hdlc <- all_data$TotalTGs_seg/all_data$`HDL-C`
+all_data$vldlpeq <- all_data$`Small VLDL-P (nmol/L)`/all_data$`VLDL-P (nmol/L)`
+all_data$ldlpeq <-  all_data$`Small LDL-P (nmol/L)`/all_data$`LDL-P (nmol/L)`
+all_data$hdlindex <- all_data$`HDL-TG`/all_data$`HDL-C`
+
+# afegin columna de poblacio de risc
+all_data <- all_data %>%
+  mutate(
+    risk = factor(ifelse(ID_mostres %in% pobl_risc$ID_mostres, 2, 1))
+  )
+# Canviem el valor de la glucosa en mg/dL de la iaia, perque estava malament
+all_data[1910,38]=104.15
+
+# FILTRES PELS PLOTS
+aux <- all_data %>%
+  filter(TotalTGs_seg <= 700,          # Filter for total TGs
+         remnant <= 200,                # Filter for remnant
+         tg_hdlc <= 50,                 # Filter for tg_hdlc
+         hdlindex <= 5,
+         TotalChol_seg >50,
+         `Glucose_mg/dl_seg`<2000,
+         LDLTG_LDLC_seg < 0.85,
+         )
+```
+
+### REPRESENTACIONS
+
+```{r first plot code}
+# Function to create a scatter plot with a gradient background
+create_plot <- function(data, x_var, y_var, grouping_var) {
+  # Create a sequence for the x-axis limits
+  x_limits <- seq(floor(min(data[[x_var]])), ceiling(max(data[[x_var]])), by = 10)
+
+  # Create a data frame for the gradient background
+  gradient_background <- data.frame(
+    xmin = x_limits[-length(x_limits)],
+    xmax = x_limits[-1],
+    fill = scales::gradient_n_pal(c("white", "gray70"))(seq(0, 1, length.out = length(x_limits) - 1))
+  )
+  
+  data <- data %>%
+    mutate(color_group = cut(!!as.name(x_var), breaks = x_limits, include.lowest = TRUE))
+  
+  # Create the plot
+  ggplot(data, aes_string(x = x_var, y = paste0('`',y_var,'`'), color = "color_group")) +
+    geom_rect(data = gradient_background, aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill), 
+              alpha = 0.3, inherit.aes = FALSE) +
+    geom_point(alpha = 0.5) +
+    geom_smooth(method = "loess",aes(colour = data[[x_var]])) +
+    labs(x = x_var, y = paste0('`',y_var,'`')) +
+    scale_fill_identity() +  # Use the colors directly
+    scale_x_continuous(breaks = seq(floor(min(data[[x_var]])), ceiling(max(data[[x_var]])), by = 10)) + # More ticks every 2 units
+    facet_grid(grouping_var) +
+    theme_minimal() +
+    theme(legend.position = "none")  # Hide the legend for fill
+}
+```
+
+```{r checking the number of subjects in each group of age, echo=FALSE, message=FALSE, warning=FALSE}
+# Filter and summarize data for women
+women_summary <- data_ %>%
+  filter(Sexo == "Mujer") %>%
+  count(Edad, name = "Count_Women") %>%  # Count the instances of each Edad
+  arrange(Edad)
+
+# Summarize data for both women and men
+wandm_summary <- data_ %>%
+  count(Edad, name = "Count_WandM") %>%  # Count the instances of each Edad
+  arrange(Edad)
+
+# Combine the two summaries by Edad for side-by-side comparison
+combined_summary <- women_summary %>%
+  full_join(wandm_summary, by = "Edad") %>%
+  replace_na(list(Count_Women = 0, Count_WandM = 0))  # Replace NA with 0 if Edad does not appear in both summaries
+
+# Display the combined summary table with conditional formatting
+kable(combined_summary,
+      col.names = c("Edad", "Count (Women)", "Count (Women & Men)"),
+      caption = "Summary of Age Counts for Women and Combined Women & Men") %>%
+  kable_styling() %>%
+  column_spec(2, 
+              background = ifelse(combined_summary$Count_Women < 10, "lightcoral", "white")) %>%
+  column_spec(3, 
+              background = ifelse(combined_summary$Count_WandM < 10, "lightcoral", "white"))
+```
+
+```{r testing the x median location, include=FALSE}
+# summary_stats <- data_ %>%
+#   filter(Sexo == "Mujer", Edad < 87) %>% 
+#   group_by_at("Edad") %>%
+#   summarise(
+#     median_y = median(!!as.name("ldlpeq"), na.rm = TRUE),
+#     sd_y = sd(!!as.name("ldlpeq"), na.rm = TRUE)
+#   )
+# 
+# # Extract the y-value from the first row of data2
+# target_value <- iaia[["ldlpeq"]][1]
+# 
+# # Calculate the absolute difference between the target and each median in data1
+# summary_stats <- summary_stats %>%
+#   mutate(
+#     diff = abs(median_y - target_value)
+#   )
+# 
+# # Find the minimum difference
+# min_diff <- min(summary_stats$diff, na.rm = TRUE)
+# 
+# # Filter rows where the difference is close to this minimum (within a small threshold)
+# closest_points <- summary_stats %>%
+#   filter(abs(diff - min_diff) < 0.5)
+# 
+# # If multiple points are equally close, select the one with the smallest standard deviation
+# best_match <- closest_points %>%
+#   arrange(sd_y) %>%
+#   slice(1) %>%
+#   pull(!!as.name("Edad"))
+```
+
+```{r find_closest_function, message=FALSE, warning=FALSE}
+find_closest_x <- function(data1, data2, y_var, threshold = 0.05) {
+  # Filter out groups of Edad with fewer than 10 instances
+  data1_filtered <- data1 %>%
+    group_by(Edad) %>%
+    filter(n() > 5) %>%
+    ungroup()
+  
+  # Calculate median and standard deviation for each unique Edad value in data1_filtered
+  summary_stats <- data1_filtered %>%
+    group_by(Edad) %>%
+    summarise(
+      median_y = median(!!as.name(y_var), na.rm = TRUE),
+      sd_y = sd(!!as.name(y_var), na.rm = TRUE)
+    )
+  
+  # Extract the y-value from the first row of data2
+  target_value <- data2[[y_var]][1]
+  
+  # Calculate the absolute difference between the target and each median in data1
+  summary_stats <- summary_stats %>%
+    mutate(
+      diff = abs(median_y - target_value)
+    )
+  
+  # Find the minimum difference
+  min_diff <- min(summary_stats$diff, na.rm = TRUE)
+  
+  # Filter rows where the difference is close to this minimum (within a small threshold)
+  closest_points <- summary_stats %>%
+    filter(abs(diff - min_diff) < threshold)
+  
+  # If multiple points are equally close, select the one with the smallest standard deviation
+  best_match <- closest_points %>%
+    arrange(sd_y) %>%
+    slice(1) %>%
+    pull(Edad)
+  
+  return(best_match)
+}
+```
+
+#### PLOTS
+
+##### create_plot_point\_\_boxplot
+
+```{r plotting_functions, warning=FALSE}
+
+
+create_plot <- function(data, x_var, y_var, grouping_var, label = NULL, all) {
+  
+  # un dataset per la info de la iaia
+  iaia <- data %>% filter(Edad == 100)
+  # dataset amb la resta de la info
+  if (all == TRUE){
+    data <- data %>%
+    filter(Edad < 87) %>% 
+    filter(!is.na(!!as.name(x_var))) %>% 
+    filter(!is.na(!!as.name(y_var)))
+    #print(nrow(data))
+  }
+  else{
+    data <- data %>%
+    filter(Sexo == "Mujer", Edad < 87) %>% 
+    filter(!is.na(!!as.name(x_var))) %>% 
+    filter(!is.na(!!as.name(y_var)))
+    #print(nrow(data))
+  }
+  
+  # Create a sequence for the x-axis limits
+  x_limits <- seq(floor(min(data[[x_var]])), ceiling(max(data[[x_var]])), by = 10)
+
+  # Create a data frame for the gradient background
+  gradient_background <- data.frame(
+    xmin = x_limits[-length(x_limits)],
+    xmax = x_limits[-1],
+    fill = scales::gradient_n_pal(c("white", "gray70", "white"))(seq(0, 1, length.out = length(x_limits) - 1))
+  )
+  
+  data <- data %>%
+    mutate(color_group = cut(!!as.name(x_var), breaks = x_limits, include.lowest = TRUE))
+  
+  # Create the plot
+  p <- ggplot(data, aes_string(x = x_var, y = paste0('`',y_var,'`'), color = "color_group")) +
+    #geom_hline( yintercept = intercept , color = "gray", size = 4.5, alpha = .8) +
+    geom_point(alpha = 0.5) +
+    geom_smooth(method = "loess",aes(colour = data[[x_var]]), se = TRUE) +
+    labs(
+      x = "Age", 
+      y = if (!is.null(label) && label != "") label else paste0(y_var)
+    ) +
+    scale_fill_identity() +  # Use the colors directly
+    scale_x_continuous(breaks = seq(floor(min(data[[x_var]])), ceiling(max(data[[x_var]])), by = 5)) + # More ticks every 2 units
+    # scale_y_continuous(breaks = seq(floor(min(data[[y_var]])), ceiling(max(data[[y_var]])), by = (max(data[[y_var]])-min(data[[y_var]]))/10),
+    #                    labels = function(x) ifelse(abs(x) >= 2, round(x), round(x, 2))) +
+    scale_y_continuous(n.breaks = 10) +
+    #facet_grid(grouping_var) +
+    theme_minimal() +
+    theme(
+      legend.position = "none"
+      #, panel.grid = element_blank() # Hide the grid
+          )  # Hide the legend for fill
+  
+  
+  # POBLACIO DE RISC
+  risk_data <- data %>%
+    filter(risk == 2)
+  # HIGHLIGHT POBLACIO RISC
+  p <- p + geom_point(data = risk_data, aes_string(x = x_var, y = paste0('`',y_var,'`')), color = "#CB4042", size = 3, shape = 21, alpha =.5, fill = "#F19483")
+  
+  # # VALORS EIXOS IAIA
+  #intercept <- iaia[[y_var]]
+  #edad_iaia = find_closest_x(data, iaia, y_var, threshold = 0.01)
+  # # PUNT EN LA MEDIANA MES SEMBLANT
+  # p <- p + geom_point(data = iaia, aes_string(x = edad_iaia, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+  
+  # TREIEM ELS LLINDARS DELS EIXOS
+  # plot_build <- ggplot_build(p)
+  # x_range <- plot_build$layout$panel_params[[1]]$x.range
+  # y_range <- plot_build$layout$panel_params[[1]]$y.range
+  
+  
+  # RECTANGLE BLANC
+  p <- p +
+  geom_rect(
+    aes(xmin = 86.5, xmax = Inf, ymin = -Inf, ymax = Inf),
+    fill = "white", color = NA  # Fill the rectangle with white and no border
+  )
+
+  # BOXPLOT
+  p <- p +
+  geom_boxplot(
+    data = risk_data,
+    aes(x = 92.5, y = risk_data[[y_var]]),
+    width = 3,
+    color = "#CB4042",
+    fill = "#CB4042",
+    alpha = .5
+  )
+  
+  # LINEA HORITZONTAL
+  if (y_var %in% colnames(iaia) && any(!is.na(iaia[[y_var]]) & iaia[[y_var]] != 0)) {
+    # LINEA
+    # p1 <- p + geom_segment(data = iaia, 
+    #                        aes_string(y = paste0('`', y_var, '`'), 
+    #                                   yend = paste0('`', y_var, '`'), 
+    #                                   x = 26, xend = 92.6), 
+    #                        color = "black", size = 1, 
+    #                        fill = "#a8a8a8", alpha = .8)
+    
+    
+    # punt a la dreta
+    p1 <- p + geom_point(data = iaia, aes_string(x = 89, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+    
+    # punt a la mediana
+    # intercept <- iaia[[y_var]]
+    # edad_iaia = find_closest_x(data, iaia, y_var, threshold = 0.01)
+    # p1 <- p + geom_point(data = iaia, aes_string(x = edad_iaia, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+    
+    
+  } else {
+    # Return NULL or an empty plot if the conditions are not met
+    p1 <- NULL
+    message("The specified column for the y variable does not exist, or contains only zeros or missing values.")
+  }
+
+  return(p1)
+
+}
+
+```
+
+##### linea_boxplot
+
+```{r create_plot_linea_boxplot}
+
+create_plot_linea_boxplot <- function(data, x_var, y_var, grouping_var, label = NULL, all) {
+  
+  # un dataset per la info de la iaia
+  iaia <- data %>% filter(Edad == 100)
+  # dataset amb la resta de la info
+  if (all == TRUE){
+    data <- data %>%
+    filter(Edad < 87) %>% 
+    filter(!is.na(!!as.name(x_var))) %>% 
+    filter(!is.na(!!as.name(y_var)))
+    #print(nrow(data))
+  }
+  else{
+    data <- data %>%
+    filter(Sexo == "Mujer", Edad < 87) %>% 
+    filter(!is.na(!!as.name(x_var))) %>% 
+    filter(!is.na(!!as.name(y_var)))
+    #print(nrow(data))
+  }
+  
+  # Create a sequence for the x-axis limits
+  x_limits <- seq(floor(min(data[[x_var]])), ceiling(max(data[[x_var]])), by = 10)
+
+  # Create a data frame for the gradient background
+  gradient_background <- data.frame(
+    xmin = x_limits[-length(x_limits)],
+    xmax = x_limits[-1],
+    fill = scales::gradient_n_pal(c("white", "gray70", "white"))(seq(0, 1, length.out = length(x_limits) - 1))
+  )
+  
+  data <- data %>%
+    mutate(color_group = cut(!!as.name(x_var), breaks = x_limits, include.lowest = TRUE))
+  
+  # Create the plot
+  p <- ggplot(data, aes_string(x = x_var, y = paste0('`',y_var,'`'), color = "color_group")) +
+    #geom_hline( yintercept = intercept , color = "gray", size = 4.5, alpha = .8) +
+    geom_point(alpha = 0.5) +
+    geom_smooth(method = "loess",aes(colour = data[[x_var]]), se = TRUE) +
+    labs(
+      x = "Age", 
+      y = if (!is.null(label) && label != "") label else paste0(y_var)
+    ) +
+    scale_fill_identity() +  # Use the colors directly
+    scale_x_continuous(breaks = seq(floor(min(data[[x_var]])), ceiling(max(data[[x_var]])), by = 5)) + # More ticks every 2 units
+    # scale_y_continuous(breaks = seq(floor(min(data[[y_var]])), ceiling(max(data[[y_var]])), by = (max(data[[y_var]])-min(data[[y_var]]))/10),
+    #                    labels = function(x) ifelse(abs(x) >= 2, round(x), round(x, 2))) +
+    scale_y_continuous(n.breaks = 10) +
+    #facet_grid(grouping_var) +
+    theme_minimal() +
+    theme(
+      legend.position = "none"
+      #, panel.grid = element_blank() # Hide the grid
+          )  # Hide the legend for fill
+  
+  
+  # POBLACIO DE RISC
+  risk_data <- data %>%
+    filter(risk == 2)
+  # HIGHLIGHT POBLACIO RISC
+  p <- p + geom_point(data = risk_data, aes_string(x = x_var, y = paste0('`',y_var,'`')), color = "#CB4042", size = 3, shape = 21, alpha =.5, fill = "#F19483")
+  
+  # # VALORS EIXOS IAIA
+  #intercept <- iaia[[y_var]]
+  #edad_iaia = find_closest_x(data, iaia, y_var, threshold = 0.01)
+  # # PUNT EN LA MEDIANA MES SEMBLANT
+  # p <- p + geom_point(data = iaia, aes_string(x = edad_iaia, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+  
+  # TREIEM ELS LLINDARS DELS EIXOS
+  # plot_build <- ggplot_build(p)
+  # x_range <- plot_build$layout$panel_params[[1]]$x.range
+  # y_range <- plot_build$layout$panel_params[[1]]$y.range
+  
+  
+  # RECTANGLE BLANC
+  p <- p +
+  geom_rect(
+    aes(xmin = 86.5, xmax = Inf, ymin = -Inf, ymax = Inf),
+    fill = "white", color = NA  # Fill the rectangle with white and no border
+  )
+  
+  # BOXPLOT
+  p <- p +
+  geom_boxplot(
+    data = risk_data,
+    aes(x = 91, y = risk_data[[y_var]]),
+    width = 3,
+    color = "#CB4042",
+    fill = "#CB4042",
+    alpha = .5
+  )
+  
+  # LINEA HORITZONTAL
+  if (y_var %in% colnames(iaia) && any(!is.na(iaia[[y_var]]) & iaia[[y_var]] != 0)) {
+    # LINEA
+    p1 <- p + geom_segment(data = iaia,
+                           aes_string(y = paste0('`', y_var, '`'),
+                                      yend = paste0('`', y_var, '`'),
+                                      x = 26, xend = 92.6),
+                           color = "black", size = 1,
+                           fill = "#a8a8a8", alpha = .8,
+                           linetype = "21")
+    
+    
+    # # punt a la dreta
+    # p1 <- p + geom_point(data = iaia, aes_string(x = 89, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+    # 
+    
+    # # punt a la mediana
+    # intercept <- iaia[[y_var]]
+    # edad_iaia = find_closest_x(data, iaia, y_var, threshold = 0.01)
+    # p1 <- p + geom_point(data = iaia, aes_string(x = edad_iaia, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+    
+    
+  } else {
+    # Return NULL or an empty plot if the conditions are not met
+    p1 <- NULL
+    message("The specified column for the y variable does not exist, or contains only zeros or missing values.")
+  }
+
+  return(p1)
+
+  }
+```
+
+##### median_clean
+
+```{r create_plot_median_clean}
+
+create_plot_median_clean <- function(data, x_var, y_var, grouping_var, label = NULL, all) {
+  
+  # un dataset per la info de la iaia
+  iaia <- data %>% filter(Edad == 100)
+  # dataset amb la resta de la info
+  if (all == TRUE){
+    data <- data %>%
+    filter(Edad < 87) %>% 
+    filter(!is.na(!!as.name(x_var))) %>% 
+    filter(!is.na(!!as.name(y_var)))
+    #print(nrow(data))
+  }
+  else{
+    data <- data %>%
+    filter(Sexo == "Mujer", Edad < 87) %>% 
+    filter(!is.na(!!as.name(x_var))) %>% 
+    filter(!is.na(!!as.name(y_var)))
+    #print(nrow(data))
+  }
+  
+  # Create a sequence for the x-axis limits
+  x_limits <- seq(floor(min(data[[x_var]])), ceiling(max(data[[x_var]])), by = 10)
+
+  # Create a data frame for the gradient background
+  gradient_background <- data.frame(
+    xmin = x_limits[-length(x_limits)],
+    xmax = x_limits[-1],
+    fill = scales::gradient_n_pal(c("white", "gray70", "white"))(seq(0, 1, length.out = length(x_limits) - 1))
+  )
+  
+  data <- data %>%
+    mutate(color_group = cut(!!as.name(x_var), breaks = x_limits, include.lowest = TRUE))
+  
+  # Create the plot
+  p <- ggplot(data, aes_string(x = x_var, y = paste0('`',y_var,'`'), color = "color_group")) +
+    #geom_hline( yintercept = intercept , color = "gray", size = 4.5, alpha = .8) +
+    geom_point(alpha = 0.5) +
+    geom_smooth(method = "loess",aes(colour = data[[x_var]]), se = TRUE) +
+    labs(
+      x = "Age", 
+      y = if (!is.null(label) && label != "") label else paste0(y_var)
+    ) +
+    scale_fill_identity() +  # Use the colors directly
+    scale_x_continuous(breaks = seq(floor(min(data[[x_var]])), ceiling(max(data[[x_var]])), by = 5)) + # More ticks every 2 units
+    # scale_y_continuous(breaks = seq(floor(min(data[[y_var]])), ceiling(max(data[[y_var]])), by = (max(data[[y_var]])-min(data[[y_var]]))/10),
+    #                    labels = function(x) ifelse(abs(x) >= 2, round(x), round(x, 2))) +
+    scale_y_continuous(n.breaks = 10) +
+    #facet_grid(grouping_var) +
+    theme_minimal() +
+    theme(
+      legend.position = "none"
+      #, panel.grid = element_blank() # Hide the grid
+          )  # Hide the legend for fill
+  
+  
+  # POBLACIO DE RISC
+  # risk_data <- data %>%
+  #   filter(risk == 2)
+  # # HIGHLIGHT POBLACIO RISC
+  # p <- p + geom_point(data = risk_data, aes_string(x = x_var, y = paste0('`',y_var,'`')), color = "#CB4042", size = 3, shape = 21, alpha =.5, fill = "#F19483")
+  
+  # # VALORS EIXOS IAIA
+  #intercept <- iaia[[y_var]]
+  #edad_iaia = find_closest_x(data, iaia, y_var, threshold = 0.01)
+  # # PUNT EN LA MEDIANA MES SEMBLANT
+  # p <- p + geom_point(data = iaia, aes_string(x = edad_iaia, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+  
+  # TREIEM ELS LLINDARS DELS EIXOS
+  # plot_build <- ggplot_build(p)
+  # x_range <- plot_build$layout$panel_params[[1]]$x.range
+  # y_range <- plot_build$layout$panel_params[[1]]$y.range
+  
+  
+  # RECTANGLE BLANC
+  # p <- p +
+  # geom_rect(
+  #   aes(xmin = 86.5, xmax = Inf, ymin = -Inf, ymax = Inf),
+  #   fill = "white", color = NA  # Fill the rectangle with white and no border
+  # )
+
+  # BOXPLOT
+  # p <- p +
+  # geom_boxplot(
+  #   data = risk_data,
+  #   aes(x = 92.5, y = risk_data[[y_var]]),
+  #   width = 3,
+  #   color = "#CB4042",
+  #   fill = "#CB4042",
+  #   alpha = .5
+  # )
+  
+  # LINEA HORITZONTAL
+  # if (y_var %in% colnames(iaia) && any(!is.na(iaia[[y_var]]) & iaia[[y_var]] != 0)) {
+  #   # LINEA
+  #   # p1 <- p + geom_segment(data = iaia, 
+  #   #                        aes_string(y = paste0('`', y_var, '`'), 
+  #   #                                   yend = paste0('`', y_var, '`'), 
+  #   #                                   x = 26, xend = 92.6), 
+  #   #                        color = "black", size = 1, 
+  #   #                        fill = "#a8a8a8", alpha = .8)
+  #   
+  #   
+  #   # punt a la dreta
+  #   # p1 <- p + geom_point(data = iaia, aes_string(x = 89, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+  #   
+  #   # punt a la mediana
+  #   intercept <- iaia[[y_var]]
+  #   edad_iaia = find_closest_x(data, iaia, y_var, threshold = 0.01)
+  #   p1 <- p + geom_point(data = iaia, aes_string(x = edad_iaia, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+  #   
+  #   
+  # } else {
+  #   # Return NULL or an empty plot if the conditions are not met
+  #   p1 <- NULL
+  #   message("The specified column for the y variable does not exist, or contains only zeros or missing values.")
+  # }
+
+  return(p)
+
+}
+```
+
+##### create_plot_median_risk
+
+```{r create_plot_median_risk}
+
+create_plot_median_risk <- function(data, x_var, y_var, grouping_var, label = NULL, all) {
+  
+  # un dataset per la info de la iaia
+  iaia <- data %>% filter(Edad == 100)
+  # dataset amb la resta de la info
+  if (all == TRUE){
+    data <- data %>%
+    filter(Edad < 87) %>% 
+    filter(!is.na(!!as.name(x_var))) %>% 
+    filter(!is.na(!!as.name(y_var)))
+    #print(nrow(data))
+  }
+  else{
+    data <- data %>%
+    filter(Sexo == "Mujer", Edad < 87) %>% 
+    filter(!is.na(!!as.name(x_var))) %>% 
+    filter(!is.na(!!as.name(y_var)))
+    #print(nrow(data))
+  }
+  
+  # Create a sequence for the x-axis limits
+  x_limits <- seq(floor(min(data[[x_var]])), ceiling(max(data[[x_var]])), by = 10)
+
+  # Create a data frame for the gradient background
+  gradient_background <- data.frame(
+    xmin = x_limits[-length(x_limits)],
+    xmax = x_limits[-1],
+    fill = scales::gradient_n_pal(c("white", "gray70", "white"))(seq(0, 1, length.out = length(x_limits) - 1))
+  )
+  
+  data <- data %>%
+    mutate(color_group = cut(!!as.name(x_var), breaks = x_limits, include.lowest = TRUE))
+  
+  # Create the plot
+  p <- ggplot(data, aes_string(x = x_var, y = paste0('`',y_var,'`'), color = "color_group")) +
+    #geom_hline( yintercept = intercept , color = "gray", size = 4.5, alpha = .8) +
+    geom_point(alpha = 0.5) +
+    geom_smooth(method = "loess",aes(colour = data[[x_var]]), se = TRUE) +
+    labs(
+      x = "Age", 
+      y = if (!is.null(label) && label != "") label else paste0(y_var)
+    ) +
+    scale_fill_identity() +  # Use the colors directly
+    scale_x_continuous(breaks = seq(floor(min(data[[x_var]])), ceiling(max(data[[x_var]])), by = 5)) + # More ticks every 2 units
+    # scale_y_continuous(breaks = seq(floor(min(data[[y_var]])), ceiling(max(data[[y_var]])), by = (max(data[[y_var]])-min(data[[y_var]]))/10),
+    #                    labels = function(x) ifelse(abs(x) >= 2, round(x), round(x, 2))) +
+    scale_y_continuous(n.breaks = 10) +
+    #facet_grid(grouping_var) +
+    theme_minimal() +
+    theme(
+      legend.position = "none"
+      #, panel.grid = element_blank() # Hide the grid
+          )  # Hide the legend for fill
+  
+  
+  # POBLACIO DE RISC
+  risk_data <- data %>%
+    filter(risk == 2)
+  # HIGHLIGHT POBLACIO RISC
+  p <- p + geom_point(data = risk_data, aes_string(x = x_var, y = paste0('`',y_var,'`')), color = "#CB4042", size = 3, shape = 21, alpha =.5, fill = "#F19483")
+  
+  # # VALORS EIXOS IAIA
+  #intercept <- iaia[[y_var]]
+  #edad_iaia = find_closest_x(data, iaia, y_var, threshold = 0.01)
+  # # PUNT EN LA MEDIANA MES SEMBLANT
+  # p <- p + geom_point(data = iaia, aes_string(x = edad_iaia, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+  
+  # TREIEM ELS LLINDARS DELS EIXOS
+  # plot_build <- ggplot_build(p)
+  # x_range <- plot_build$layout$panel_params[[1]]$x.range
+  # y_range <- plot_build$layout$panel_params[[1]]$y.range
+  
+  
+  # RECTANGLE BLANC
+  # p <- p +
+  # geom_rect(
+  #   aes(xmin = 86.5, xmax = Inf, ymin = -Inf, ymax = Inf),
+  #   fill = "white", color = NA  # Fill the rectangle with white and no border
+  # )
+
+  # BOXPLOT
+  # p <- p +
+  # geom_boxplot(
+  #   data = risk_data,
+  #   aes(x = 92.5, y = risk_data[[y_var]]),
+  #   width = 3,
+  #   color = "#CB4042",
+  #   fill = "#CB4042",
+  #   alpha = .5
+  # )
+  
+  # LINEA HORITZONTAL
+  if (y_var %in% colnames(iaia) && any(!is.na(iaia[[y_var]]) & iaia[[y_var]] != 0)) {
+    # LINEA
+    # p1 <- p + geom_segment(data = iaia, 
+    #                        aes_string(y = paste0('`', y_var, '`'), 
+    #                                   yend = paste0('`', y_var, '`'), 
+    #                                   x = 26, xend = 92.6), 
+    #                        color = "black", size = 1, 
+    #                        fill = "#a8a8a8", alpha = .8)
+    
+    
+    # punt a la dreta
+    # p1 <- p + geom_point(data = iaia, aes_string(x = 89, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+    
+    # punt a la mediana
+    intercept <- iaia[[y_var]]
+    edad_iaia = find_closest_x(data, iaia, y_var, threshold = 0.01)
+    p1 <- p + geom_point(data = iaia, aes_string(x = edad_iaia, y = paste0('`',y_var,'`')), color = "black", size = 5, shape = 18, alpha =1, fill = "#a8a8a8")
+    
+    
+  } else {
+    # Return NULL or an empty plot if the conditions are not met
+    p1 <- NULL
+    message("The specified column for the y variable does not exist, or contains only zeros or missing values.")
+  }
+
+  return(p1)
+
+}
+```
+
+```{r}
+create_plot(aux, "Edad", "TotalChol_seg", "Sexo", "Total Cholesterol (mg/dL)", FALSE)
+
+create_plot_linea_boxplot(aux, "Edad", "TotalChol_seg", "Sexo", "Total Cholesterol (mg/dL)", FALSE)
+
+create_plot_median_clean(aux, "Edad", "TotalChol_seg", "Sexo", "Total Cholesterol (mg/dL)", FALSE)
+
+create_plot_median_risk(aux, "Edad", "TotalChol_seg", "Sexo", "Total Cholesterol (mg/dL)", FALSE)
+
+create_plot(aux, "Edad", "VLDL-Z (nm)", "Sexo", "VLDL-Z (nm)", FALSE)
+
+create_plot_linea_boxplot(aux, "Edad", "VLDL-Z (nm)", "Sexo", "VLDL-Z (nm)", FALSE)
+
+create_plot_median_clean(aux, "Edad", "VLDL-Z (nm)", "Sexo", "VLDL-Z (nm)", FALSE)
+
+create_plot_median_risk(aux, "Edad", "VLDL-Z (nm)", "Sexo", "VLDL-Z (nm)", FALSE)
+```
+
+**SALUD CARDIOVASCULAR**
+
+```{r, warning=FALSE, message=FALSE}
+# Generate the plots with the auxiliary DataFrame
+create_plot_linea_boxplot(aux, "Edad", "TotalChol_seg", "Sexo", "Total Cholesterol (mg/dL)", FALSE)
+create_plot(aux, "Edad", "TotalTGs_seg", "Sexo", "Total Triglycerides (mg/dL)", TRUE)
+create_plot(aux, "Edad", "remnant", "Sexo", "Remnant Cholesterol (mg/dL)")
+create_plot(aux, "Edad", "LDL-C", "Sexo", "LDL-C (mg/dL)")
+create_plot(aux, "Edad", "tg_hdlc", "Sexo", "Total Triglycerides / HDL-C")
+create_plot(aux, "Edad", "vldlpeq", "Sexo", "Small VLDL-P / VLDL-P")
+create_plot(aux, "Edad", "ldlpeq", "Sexo", "Small LDL-P / LDL-P")
+create_plot(aux, "Edad", "HDL-C", "Sexo", "HDL-C (mg/dL)")
+create_plot(aux, "Edad", "hdlindex", "Sexo", "HDL-TG / HDL-C")
+
+```
+
+**INFLAMACION**
+
+```{r, warning=FALSE, message=FALSE}
+create_plot(aux, "Edad", "Glyc-A (μmol/L)", "Sexo")
+create_plot(aux, "Edad", "Glyc-B (μmol/L)", "Sexo")
+```
+
+**METABOLISMO ENERGETICO**
+
+```{r, warning=FALSE, message=FALSE}
+create_plot(aux, "Edad", "Glucose_mg/dl_seg", "Sexo", "Glucose")
+create_plot(aux, "Edad", "Lactate(4,095)", "Sexo", "")
+# create_plot(aux, "Edad", "3-Hydroxybutyrate", "Sexo") NA
+create_plot(aux, "Edad", "Acetone", "Sexo")
+create_plot(aux, "Edad", "Tyrosine(6,9)", "Sexo")
+create_plot(aux, "Edad", "Alanine", "Sexo")
+```
+
+**MASA MUSCULAR**
+
+```{r, warning=FALSE, message=FALSE}
+create_plot(aux, "Edad", "Glutamine", "Sexo")
+create_plot(aux, "Edad", "Glutamate", "Sexo")
+create_plot(aux, "Edad", "Creatine", "Sexo")
+create_plot(aux, "Edad", "Valine(1,05)", "Sexo")
+create_plot(aux, "Edad", "Leucine", "Sexo")
+create_plot(aux, "Edad", "Isoleucine(1,019)", "Sexo")
+```
+
+**FUNCIO RENAL**
+
+```{r, warning=FALSE, message=FALSE}
+create_plot(aux, "Edad", "Creatinine(4,04)", "Sexo")
+```
+
+------------------------------------------------------------------------
+
+```{r}
+# Cleaned column names with updated ratio format and units
+cleaned_colnames <- c(
+  "VLDL-C (mg/dL)", "IDL-C (mg/dL)", "LDL-C (mg/dL)", "HDL-C (mg/dL)", "VLDL-TG (mg/dL)",
+  "IDL-TG (mg/dL)", "LDL-TG (mg/dL)", "HDL-TG (mg/dL)", "VLDL-P (nmol/L)", "Large VLDL-P (nmol/L)",
+  "Medium VLDL-P (nmol/L)", "Small VLDL-P (nmol/L)", "LDL-P (nmol/L)", "Large LDL-P (nmol/L)",
+  "Medium LDL-P (nmol/L)", "Small LDL-P (nmol/L)", "HDL-P (μmol/L)", "Large HDL-P (μmol/L)",
+  "Medium HDL-P (μmol/L)", "Small HDL-P (μmol/L)", "VLDL-Z (nm)", "LDL-Z (nm)", "HDL-Z (nm)",
+  "Glyc-B (μmol/L)", "Glyc-F (μmol/L)", "Glyc-A (μmol/L)", "H/W Glyc-B", "H/W Glyc-A",
+  "3-Hydroxybutyrate (μmol/L)", "Acetate (μmol/L)", "Acetone (μmol/L)", "Alanine (μmol/L)",
+  "Creatine (μmol/L)", "Glucose (mg/dL)", "Glucose (mg/dL)", "Glutamine (μmol/L)",
+  "Glycerol (μmol/L)", "Glycine (μmol/L)", "Histidine (μmol/L)", "Threonine (μmol/L)",
+  "Tyrosine (μmol/L)", "Valine (μmol/L)", "Isoleucine (μmol/L)", "Leucine (μmol/L)", "Proline (μmol/L)",
+  "Lactate (μmol/L)", "Creatinine (μmol/L)", "Pyruvate (μmol/L)", "Glutamate (μmol/L)",
+  "TC (mmol/L)", "EC (mmol/L)", "FC (mmol/L)", "TG (mmol/L)", "PL (mmol/L)", "PC (mmol/L)",
+  "SM (mmol/L)", "LPC (mmol/L)", "PUFA (mmol/L)", "LA (mmol/L)", "SFA (mmol/L)", "W6W7 (mmol/L)",
+  "W9 (mmol/L)", "W3 (mmol/L)", "DHA (mmol/L)", "ARA+EPA (mmol/L)", "Total Cholesterol (mg/dL)",
+  "Total TGs (mg/dL)", "VLDL-TG / VLDL-C", "IDL-TG / IDL-C", "LDL-TG / LDL-C", "HDL-TG / HDL-C",
+  "Glutamine / Glutamate", "Lactate / Glucose", "Pyruvate / Lactate", "Pyruvate / Glucose",
+  "Creatine / Creatinine", "BCAAs", "Creatine+Creatinine", "Remnant Cholesterol (mg/dL)", "Total Triglycerides / HDL-C",
+  "Small VLDL-P / VLDL-P", "Small LDL-P / LDL-P", "HDL Index (HDL-TG / HDL-C)", "Risk"
+)
+
+```
+
+#### ALL PLOTS
+
+```{r, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+
+if (!dir.exists("Supercenternaria_dist")) {
+  dir.create("Supercenternaria_dist")
+}
+
+dist_name = "point_boxplot"
+
+if (!dir.exists(paste0("Supercenternaria_dist/", dist_name, "/all"))) {
+  dir.create(paste0("Supercenternaria_dist/", dist_name, "/all"), recursive = TRUE)
+}
+
+# Loop through the columns of the DataFrame from 4 to the second-to-last column
+for (i in 4:(ncol(aux) - 1)) {
+  col_name <- names(aux)[i]  # Get the original column name
+  print(col_name)
+  cleaned_name <- cleaned_colnames[i-3]  # Get the cleaned column name from the corresponding position
+  print(cleaned_name)
+
+  if (col_name == "Acetate"){
+    aux_acetate <- aux %>% filter(Acetate < 300)
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot(aux_acetate, "Edad", col_name, "Sexo", cleaned_name, TRUE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  else {
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot(aux, "Edad", col_name, "Sexo", cleaned_name, TRUE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  
+  # Proceed only if the plot was created successfully
+  if (!is.null(plot)) {
+    # Define the file path using the cleaned column name
+    clean_col_name <- gsub("[^A-Za-z]", "", col_name) 
+    file_path <- file.path(paste0("Supercenternaria_dist/",dist_name,"/all"), paste0(i,"_",clean_col_name, "_dist_all.svg"))
+    
+    # Save the plot as a high-quality SVG
+    ggsave(filename = file_path, plot = plot, device = "svg", 
+           width = 6, height = 4)
+  }
+}
+
+#=======================================================================
+
+if (!dir.exists(paste0("Supercenternaria_dist/", dist_name, "/women"))) {
+  dir.create(paste0("Supercenternaria_dist/", dist_name, "/women"), recursive = TRUE)
+}
+
+# Loop through the columns of the DataFrame from 4 to the second-to-last column
+for (i in 4:(ncol(aux) - 1)) {
+  col_name <- names(aux)[i]  # Get the original column name
+  print(col_name)
+  cleaned_name <- cleaned_colnames[i-3]  # Get the cleaned column name from the corresponding position
+  print(cleaned_name)
+  
+  if (col_name == "Acetate"){
+    aux_acetate <- aux %>% filter(Acetate < 300)
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot(aux_acetate, "Edad", col_name, "Sexo", cleaned_name, FALSE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  else {
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot(aux, "Edad", col_name, "Sexo", cleaned_name, FALSE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  
+  # Proceed only if the plot was created successfully
+  if (!is.null(plot)) {
+    # Define the file path using the cleaned column name
+    clean_col_name <- gsub("[^A-Za-z]", "", col_name) 
+    file_path <- file.path(paste0("Supercenternaria_dist/",dist_name,"/women"), paste0(i,"_",clean_col_name, "_dist_women.svg"))
+    
+    # Save the plot as a high-quality SVG
+    ggsave(filename = file_path, plot = plot, device = "svg", 
+           width = 6, height = 4)
+  }
+}
+
+
+dist_name = "dashed_boxplot"
+
+if (!dir.exists(paste0("Supercenternaria_dist/", dist_name, "/all"))) {
+  dir.create(paste0("Supercenternaria_dist/", dist_name, "/all"), recursive = TRUE)
+}
+
+# Loop through the columns of the DataFrame from 4 to the second-to-last column
+for (i in 4:(ncol(aux) - 1)) {
+  col_name <- names(aux)[i]  # Get the original column name
+  print(col_name)
+  cleaned_name <- cleaned_colnames[i-3]  # Get the cleaned column name from the corresponding position
+  print(cleaned_name)
+
+  if (col_name == "Acetate"){
+    aux_acetate <- aux %>% filter(Acetate < 300)
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_linea_boxplot(aux_acetate, "Edad", col_name, "Sexo", cleaned_name, TRUE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  else {
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_linea_boxplot(aux, "Edad", col_name, "Sexo", cleaned_name, TRUE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  
+  # Proceed only if the plot was created successfully
+  if (!is.null(plot)) {
+    # Define the file path using the cleaned column name
+    clean_col_name <- gsub("[^A-Za-z]", "", col_name) 
+    file_path <- file.path(paste0("Supercenternaria_dist/",dist_name,"/all"), paste0(i,"_",clean_col_name, "_dist_all.svg"))
+    
+    # Save the plot as a high-quality SVG
+    ggsave(filename = file_path, plot = plot, device = "svg", 
+           width = 6, height = 4)
+  }
+}
+
+#=======================================================================
+
+if (!dir.exists(paste0("Supercenternaria_dist/", dist_name, "/women"))) {
+  dir.create(paste0("Supercenternaria_dist/", dist_name, "/women"), recursive = TRUE)
+}
+
+# Loop through the columns of the DataFrame from 4 to the second-to-last column
+for (i in 4:(ncol(aux) - 1)) {
+  col_name <- names(aux)[i]  # Get the original column name
+  print(col_name)
+  cleaned_name <- cleaned_colnames[i-3]  # Get the cleaned column name from the corresponding position
+  print(cleaned_name)
+  
+  if (col_name == "Acetate"){
+    aux_acetate <- aux %>% filter(Acetate < 300)
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_linea_boxplot(aux_acetate, "Edad", col_name, "Sexo", cleaned_name, FALSE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  else {
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_linea_boxplot(aux, "Edad", col_name, "Sexo", cleaned_name, FALSE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  
+  # Proceed only if the plot was created successfully
+  if (!is.null(plot)) {
+    # Define the file path using the cleaned column name
+    clean_col_name <- gsub("[^A-Za-z]", "", col_name) 
+    file_path <- file.path(paste0("Supercenternaria_dist/",dist_name,"/women"), paste0(i,"_",clean_col_name, "_dist_women.svg"))
+    
+    # Save the plot as a high-quality SVG
+    ggsave(filename = file_path, plot = plot, device = "svg", 
+           width = 6, height = 4)
+  }
+}
+
+dist_name = "median_clean"
+
+if (!dir.exists(paste0("Supercenternaria_dist/", dist_name, "/all"))) {
+  dir.create(paste0("Supercenternaria_dist/", dist_name, "/all"), recursive = TRUE)
+}
+
+# Loop through the columns of the DataFrame from 4 to the second-to-last column
+for (i in 4:(ncol(aux) - 1)) {
+  col_name <- names(aux)[i]  # Get the original column name
+  print(col_name)
+  cleaned_name <- cleaned_colnames[i-3]  # Get the cleaned column name from the corresponding position
+  print(cleaned_name)
+
+  if (col_name == "Acetate"){
+    aux_acetate <- aux %>% filter(Acetate < 300)
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_median_clean(aux_acetate, "Edad", col_name, "Sexo", cleaned_name, TRUE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  else {
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_median_clean(aux, "Edad", col_name, "Sexo", cleaned_name, TRUE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  
+  # Proceed only if the plot was created successfully
+  if (!is.null(plot)) {
+    # Define the file path using the cleaned column name
+    clean_col_name <- gsub("[^A-Za-z]", "", col_name) 
+    file_path <- file.path(paste0("Supercenternaria_dist/",dist_name,"/all"), paste0(i,"_",clean_col_name, "_dist_all.svg"))
+    
+    # Save the plot as a high-quality SVG
+    ggsave(filename = file_path, plot = plot, device = "svg", 
+           width = 6, height = 4)
+  }
+}
+
+#=======================================================================
+
+if (!dir.exists(paste0("Supercenternaria_dist/", dist_name, "/women"))) {
+  dir.create(paste0("Supercenternaria_dist/", dist_name, "/women"), recursive = TRUE)
+}
+
+# Loop through the columns of the DataFrame from 4 to the second-to-last column
+for (i in 4:(ncol(aux) - 1)) {
+  col_name <- names(aux)[i]  # Get the original column name
+  print(col_name)
+  cleaned_name <- cleaned_colnames[i-3]  # Get the cleaned column name from the corresponding position
+  print(cleaned_name)
+  
+  if (col_name == "Acetate"){
+    aux_acetate <- aux %>% filter(Acetate < 300)
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_median_clean(aux_acetate, "Edad", col_name, "Sexo", cleaned_name, FALSE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  else {
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_median_clean(aux, "Edad", col_name, "Sexo", cleaned_name, FALSE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  
+  # Proceed only if the plot was created successfully
+  if (!is.null(plot)) {
+    # Define the file path using the cleaned column name
+    clean_col_name <- gsub("[^A-Za-z]", "", col_name) 
+    file_path <- file.path(paste0("Supercenternaria_dist/",dist_name,"/women"), paste0(i,"_",clean_col_name, "_dist_women.svg"))
+    
+    # Save the plot as a high-quality SVG
+    ggsave(filename = file_path, plot = plot, device = "svg", 
+           width = 6, height = 4)
+  }
+}
+
+dist_name = "median_risk"
+
+if (!dir.exists(paste0("Supercenternaria_dist/", dist_name, "/all"))) {
+  dir.create(paste0("Supercenternaria_dist/", dist_name, "/all"), recursive = TRUE)
+}
+
+# Loop through the columns of the DataFrame from 4 to the second-to-last column
+for (i in 4:(ncol(aux) - 1)) {
+  col_name <- names(aux)[i]  # Get the original column name
+  print(col_name)
+  cleaned_name <- cleaned_colnames[i-3]  # Get the cleaned column name from the corresponding position
+  print(cleaned_name)
+
+  if (col_name == "Acetate"){
+    aux_acetate <- aux %>% filter(Acetate < 300)
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_median_risk(aux_acetate, "Edad", col_name, "Sexo", cleaned_name, TRUE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  else {
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_median_risk(aux, "Edad", col_name, "Sexo", cleaned_name, TRUE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  
+  # Proceed only if the plot was created successfully
+  if (!is.null(plot)) {
+    # Define the file path using the cleaned column name
+    clean_col_name <- gsub("[^A-Za-z]", "", col_name) 
+    file_path <- file.path(paste0("Supercenternaria_dist/",dist_name,"/all"), paste0(i,"_",clean_col_name, "_dist_all.svg"))
+    
+    # Save the plot as a high-quality SVG
+    ggsave(filename = file_path, plot = plot, device = "svg", 
+           width = 6, height = 4)
+  }
+}
+
+#=======================================================================
+
+if (!dir.exists(paste0("Supercenternaria_dist/", dist_name, "/women"))) {
+  dir.create(paste0("Supercenternaria_dist/", dist_name, "/women"), recursive = TRUE)
+}
+
+# Loop through the columns of the DataFrame from 4 to the second-to-last column
+for (i in 4:(ncol(aux) - 1)) {
+  col_name <- names(aux)[i]  # Get the original column name
+  print(col_name)
+  cleaned_name <- cleaned_colnames[i-3]  # Get the cleaned column name from the corresponding position
+  print(cleaned_name)
+  
+  if (col_name == "Acetate"){
+    aux_acetate <- aux %>% filter(Acetate < 300)
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_median_risk(aux_acetate, "Edad", col_name, "Sexo", cleaned_name, FALSE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  else {
+    # Attempt to create the plot
+    plot <- tryCatch({
+      create_plot_median_risk(aux, "Edad", col_name, "Sexo", cleaned_name, FALSE)
+    }, error = function(e) {
+      message(paste("Failed to create plot for", col_name, ":", e$message))
+      NULL  # Return NULL if an error occurs
+    })
+  }
+  
+  # Proceed only if the plot was created successfully
+  if (!is.null(plot)) {
+    # Define the file path using the cleaned column name
+    clean_col_name <- gsub("[^A-Za-z]", "", col_name) 
+    file_path <- file.path(paste0("Supercenternaria_dist/",dist_name,"/women"), paste0(i,"_",clean_col_name, "_dist_women.svg"))
+    
+    # Save the plot as a high-quality SVG
+    ggsave(filename = file_path, plot = plot, device = "svg", 
+           width = 6, height = 4)
+  }
+}
+
+```
+
+#### INDIVIDUAL PLOT
+
+```{r to_generate_a_specific_graph}
+cleaned_name <- "Creatinine (μmol/L)"
+col_name <- "Creatinine(4,04)"
+i <- 26
+
+plot <- tryCatch({
+    create_plot_median_clean(aux, "Edad", col_name, "Sexo", cleaned_name, TRUE)
+  }, error = function(e) {
+    message(paste("Failed to create plot for", col_name, ":", e$message))
+    NULL  # Return NULL if an error occurs
+  })
+# Proceed only if the plot was created successfully
+if (!is.null(plot)) {
+  # Define the file path using the cleaned column name
+  clean_col_name <- gsub("[^A-Za-z]", "", col_name) 
+  file_path <- file.path(paste0("Supercenternaria_dist/"), paste0(i,"_",clean_col_name, "_dist_all.svg"))
+    
+    # Save the plot as a high-quality SVG
+    ggsave(filename = file_path, plot = plot, device = "svg", 
+           width = 6, height = 4)
+}
+
+plot <- tryCatch({
+    create_plot_linea_boxplot(aux, "Edad", col_name, "Sexo", cleaned_name, FALSE)
+  }, error = function(e) {
+    message(paste("Failed to create plot for", col_name, ":", e$message))
+    NULL  # Return NULL if an error occurs
+  })
+# Proceed only if the plot was created successfully
+if (!is.null(plot)) {
+  # Define the file path using the cleaned column name
+  clean_col_name <- gsub("[^A-Za-z]", "", col_name) 
+  file_path <- file.path(paste0("Supercenternaria_dist/"), paste0(i,"_",clean_col_name, "_dist_women.svg"))
+    
+    # Save the plot as a high-quality SVG
+    ggsave(filename = file_path, plot = plot, device = "svg", 
+           width = 6, height = 4)
+}
+
+```
