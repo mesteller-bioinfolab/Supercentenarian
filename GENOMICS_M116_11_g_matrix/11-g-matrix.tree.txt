@@ -1,0 +1,12 @@
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/5-idjoint.genevar.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/4-category_genes_num_voi.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/real/scripts/join.chrs.cat.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/real/scripts/join.inds.cat.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/real/scripts/voi_g_matrix.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/real/scripts/inputs.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/real/scripts/voi_g_m116.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/2-join.chrs.cat.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/regenm116.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/3-join.inds.cat.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/0-gen-inputs.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/11-g-matrix/1-perchr_ind_vector.sh
