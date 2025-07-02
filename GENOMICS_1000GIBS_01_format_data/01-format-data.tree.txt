@@ -1,0 +1,7 @@
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/01-format-data/command_het.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/01-format-data/real/scripts/move.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/01-format-data/real/scripts/create_inputs.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/01-format-data/real/scripts/het.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/01-format-data/real/scripts/get_to_exclude.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/01-format-data/command.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/01-format-data/command_qc_exclude.sh
