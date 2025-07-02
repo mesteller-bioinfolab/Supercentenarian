@@ -1,0 +1,9 @@
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/02-filter-rare/2-list_filter.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/02-filter-rare/real/scripts/filter_af_keepcommon.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/02-filter-rare/real/scripts/get_to_excl.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/02-filter-rare/real/scripts/filter_af_table.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/02-filter-rare/real/scripts/list_filter.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/02-filter-rare/real/scripts/snvs_missing.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/02-filter-rare/real/scripts/filter_af.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/02-filter-rare/3-snv-misssing.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/02-filter-rare/1-get_to_excl.sh
