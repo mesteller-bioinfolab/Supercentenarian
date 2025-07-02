@@ -1,0 +1,8 @@
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/06-make-table-split/real/scripts/ann-split_pending.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/06-make-table-split/real/scripts/vep2table.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/06-make-table-split/real/scripts/filter_af_table.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/06-make-table-split/real/scripts/ann-split.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/06-make-table-split/real/scripts/filter_af.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/06-make-table-split/KEYGEN.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/06-make-table-split/command.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/06-make-table-split/command_pending.sh
