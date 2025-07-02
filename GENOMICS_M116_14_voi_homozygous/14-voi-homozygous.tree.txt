@@ -1,0 +1,3 @@
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/14-voi-homozygous/real/scripts/voi_homozygous.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/14-voi-homozygous/gnomad_homozygous.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/14-voi-homozygous/command.sh
