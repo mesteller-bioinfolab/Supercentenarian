@@ -1,0 +1,2 @@
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/01-format-data/split_by_chr.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/01-format-data/tabix_missing.sh
