@@ -1,0 +1,1 @@
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/00-data/WGS_GRCh38_Mauricio/download.sh
