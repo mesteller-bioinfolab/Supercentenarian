@@ -1,0 +1,6 @@
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/12-rva/02-MZ/real/scripts/run_mz.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/12-rva/02-MZ/command.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/12-rva/01-CAST/real/scripts/run_cast.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/12-rva/01-CAST/command.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/12-rva/03-join-main/real/scripts/run_join.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/12-rva/03-join-main/command.sh
