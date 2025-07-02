@@ -1,0 +1,12 @@
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/wget.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/cadd15_snvs/2-common_table.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/cadd15_snvs/real/scripts/common_snvs_annotated.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/cadd15_snvs/real/scripts/common_table.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/cadd15_snvs/real/scripts/filter_af_keepcommon.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/cadd15_snvs/1-command.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/common_snvs/2-common_table.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/common_snvs/real/scripts/common_snvs_annotated.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/common_snvs/real/scripts/common_table.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/common_snvs/real/scripts/filter_af_keepcommon.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/common_snvs/1-command.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/1000GIBS/00-data/wget_new.sh
