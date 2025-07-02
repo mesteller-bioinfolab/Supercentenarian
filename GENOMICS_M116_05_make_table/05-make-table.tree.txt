@@ -1,0 +1,6 @@
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/05-make-table/real/scripts/vep2table.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/05-make-table/real/scripts/filter_af_table.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/05-make-table/real/scripts/filter_af.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/05-make-table/command_urine.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/05-make-table/command_blood.sh
+/gpfs42/projects/lab_anavarro/disease_pleiotropies/supercentenarian/Olot/05-make-table/command_saliva.sh
